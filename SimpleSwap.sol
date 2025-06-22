@@ -89,26 +89,6 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
         return (_reserveA, _reserveB);
     }
     /**
-    * @notice Approves the transfer of tokens from the contract to the `msg.sender` for both tokenA and tokenB.
-    * @dev This function calls the `approve` method of the ERC20 tokens to allow the contract to transfer the specified amounts 
-    *      of each token on behalf of the caller.
-    * @param tokenA Address of token A.
-    * @param tokenB Address of token B.
-    * @param amountA Amount of token A to approve for transfer.
-    * @param amountB Amount of token B to approve for transfer.
-    * @return success0 Boolean value indicating whether the approval for token A succeeded.
-    * @return success1 Boolean value indicating whether the approval for token B succeeded.
-    */
-    function _approveTokenTransfers(address tokenA, address tokenB, uint256 amountA, uint256 amountB) 
-            internal returns (bool success0, bool success1)  
-    {
-        success0 = IERC20(tokenA).approve(msg.sender, amountA);
-        success1 = IERC20(tokenB).approve(msg.sender, amountB);
-
-        return (success0,success1);
-    }
-
-    /**
     * @notice Safely transfers tokens from one address to another using the ERC20 `transferFrom` function.
     * @dev This function ensures that the transfer is successful by checking the result of the `transferFrom` call.
     *      If the transfer fails, it reverts the transaction with a specific error message.
