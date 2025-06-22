@@ -373,5 +373,4 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
         price = _reserveB * 1e18 / _reserveA;
         return price;
     }
-
 }
