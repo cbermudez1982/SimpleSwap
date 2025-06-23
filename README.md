@@ -40,9 +40,9 @@ Ensures that exactly two tokens are selected for any token swap operation.
 
 Retrieves the current reserves of the two tokens in the contract.
 
-#### `_approveTokenTransfers`
+#### `_getOptimalAmountOut`
 
-Approves the contract to transfer the specified amounts of tokens on behalf of the user.
+Calculates the optimal output amount of token B for a given input of token A.
 
 #### `_safeTransferFrom` / `_safeTransfer`
 
