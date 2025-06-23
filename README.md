@@ -79,19 +79,3 @@ Gets the price of one token in terms of another token, based on the current rese
 ## Constructor
 
 The constructor initializes the contract with the name "Simple Swap" and symbol "SSWP", and sets the deployer as the contract owner.
-
-## Example Usage
-
-```solidity
-SimpleSwap swap = new SimpleSwap();
-address tokenA = 0x1234567890abcdef1234567890abcdef12345678;
-address tokenB = 0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef;
-uint amountADesired = 1000;
-uint amountBDesired = 2000;
-uint amountAMin = 500;
-uint amountBMin = 1000;
-address to = msg.sender;
-uint deadline = block.timestamp + 1 hours;
-
-// Adding liquidity
-swap.addLiquidity(tokenA, tokenB, amountADesired, amountBDesired, amountAMin, amountBMin, to, deadline);
