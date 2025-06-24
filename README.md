@@ -54,6 +54,21 @@ Ensures that the liquidity reserves for both tokens are greater than zero.
 
 Ensures that exactly two tokens are selected for any token swap operation.
 
+### Events
+
+#### `LiquidityAdded`
+
+Event emited everytime liquidity is added to the pool.
+
+#### `LiquidityRemoved`
+
+Event emited everytime liquidity is removed to the pool.
+
+#### `TokenSwapped`
+
+Event emited everytime a token swap occurs in the contract.
+
+
 ### Functions
 
 #### `_getReserves`
