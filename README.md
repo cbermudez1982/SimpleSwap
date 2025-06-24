@@ -18,6 +18,17 @@ The contract uses the ERC20 standard for the liquidity pool token, implements to
 - **Burnable Tokens**: Users can burn their tokens, reducing the total supply.
 - **Owner Control**: The contract uses the `Ownable` contract, which allows the owner to manage contract parameters and permissions.
 
+---
+
+## 🧰 Tech Stack
+
+- Solidity ^0.8.27
+- OpenZeppelin Contracts ^5.0.0
+- ReentrancyGuard + Ownable
+- Sepolia testnet
+
+---
+
 ## 🚀 Deployment
 | Network   | Contract Address                             | Deployer Address                          |
 |-----------|----------------------------------------------|-------------------------------------------|
@@ -168,15 +179,6 @@ uint expectedOut = simpleSwap.getAmountOut(
 uint price = simpleSwap.getPrice(tokenA, tokenB);
 // Returns tokenB per tokenA (18 decimals)
 ```
-
----
-
-## 🧰 Tech Stack
-
-- Solidity ^0.8.27
-- OpenZeppelin Contracts ^5.0.0
-- ReentrancyGuard + Ownable
-- Sepolia testnet
 
 ---
 
