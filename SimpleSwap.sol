@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @author Carlos Bermudez
@@ -23,7 +24,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  *
  * @notice This contract is for creating a basic DEX (decentralized exchange) that supports liquidity provisioning and token swaps.
  */
-contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
+contract SimpleSwap is ERC20, ERC20Burnable, ReentrancyGuard, Ownable {
     
     /**
     * @notice Ensures that the provided deadline is later than the current block timestamp.
@@ -33,7 +34,7 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     */
     modifier checkDeadline(uint256 deadline) 
     {
-        require(deadline > block.timestamp, "Deadline reached.");
+        require(deadline > block.timestamp, "SSwap: Deadline reached.");
         _;
     }
     /**
@@ -45,7 +46,7 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     * @param _reserveB The current liquidity reserve of token B.
     */
     modifier checkLiquidity(uint256 _reserveA, uint256 _reserveB) {
-        require(_reserveA > 0 && _reserveB > 0, "SimpleSwap: Not Enough Liquidity");
+        require(_reserveA > 0 && _reserveB > 0, "SSwap: Not Enough Liquidity");
         _;
     }
     /**
@@ -56,9 +57,46 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     * @param path The array of token addresses selected for the operation.
     */
     modifier checkTokensSelected(address[] memory path) {
-        require (path.length==2, "No tokens selected.");
+        require (path.length==2, "SSwap: No tokens selected.");
         _;
     }
+    
+    /**
+    * @notice Emitted when liquidity is successfully added to the pool.
+    * @dev Logs the provider's address and the amount of token A, token B, and liquidity tokens minted.
+    * @param provider The address that added liquidity.
+    * @param tokenA The address of token A.
+    * @param tokenB The address of token B.
+    * @param amountA Amount of token A deposited.
+    * @param amountB Amount of token B deposited.
+    * @param liquidity Amount of liquidity tokens minted.
+    */
+    event LiquidityAdded(address indexed provider, address indexed tokenA, address indexed tokenB, uint256 amountA, uint256 amountB, uint256 liquidity);
+
+    /**
+    * @notice Emitted when liquidity is removed from the pool.
+    * @dev Logs the provider's address and the amounts of tokens returned to the user.
+    * @param provider The address that removed liquidity.
+    * @param tokenA The address of token A.
+    * @param tokenB The address of token B.
+    * @param amountA Amount of token A withdrawn.
+    * @param amountB Amount of token B withdrawn.
+    * @param liquidity Amount of liquidity tokens burned.
+    */
+    event LiquidityRemoved(address indexed provider, address indexed tokenA, address indexed tokenB, uint256 amountA, uint256 amountB, uint256 liquidity);
+
+    /**
+    * @notice Emitted when a token swap is executed.
+    * @dev Logs the trader, token in/out, and the amounts exchanged.
+    * @param trader The address that initiated the swap.
+    * @param tokenIn The address of the token sent by the trader.
+    * @param tokenOut The address of the token received by the trader.
+    * @param amountIn Amount of tokenIn swapped.
+    * @param amountOut Amount of tokenOut received.
+    */
+    event TokenSwapped(address indexed trader, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+
+
     /**
     * @notice Initializes the SimpleSwap contract with the name "Simple Swap" and symbol "SSWP".
     * @dev The constructor also sets the contract owner to the address that deploys the contract.
@@ -101,7 +139,7 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
             internal 
     {
         bool result = IERC20(_token).transferFrom(_from, _to, _amount);
-        require(result, "SimpleSwap: Transfer failed!");
+        require(result, "SSwap: Transfer failed!");
     }
     /**
     * @notice Safely transfers tokens to a specified address using the ERC20 `transfer` function.
@@ -115,7 +153,29 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
             internal 
     {
         bool result = IERC20(_token).transfer(_to, _amount);
-        require(result, "SimpleSwap: Transfer failed!");
+        require(result, "SSwap: Transfer failed!");
+    }
+
+    /**
+    * @notice Computes the integer square root of a given number using the Babylonian method.
+    * @dev Returns the floor value of the square root (i.e., largest integer `z` such that `z*z <= y`).
+    *      This method avoids overflow and handles small inputs explicitly.
+    * @param y The unsigned integer input to compute the square root of.
+    * @return z The integer square root of the input value.
+    */
+    function sqrt(uint y) 
+            internal pure returns (uint z) 
+    {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        } 
     }
 
     /**
@@ -135,6 +195,7 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
         _reserveA = _reserveA == 0 ? 1 : _reserveA;
         _reserveB = _reserveB == 0 ? 1 : _reserveB;
         min = (valueA / _reserveA < valueB / _reserveB) ? valueA / _reserveA : valueB / _reserveB;
+
         return min;
     }
     /**
@@ -150,7 +211,11 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     function _calculateLiquidity (address tokenA, address tokenB, uint256 amountA, uint256 amountB, uint256 totalSupply) 
             internal view returns (uint256 _liquidity) 
     {
-        _liquidity = _calculateMin(tokenA, tokenB, amountA, amountB) * (totalSupply == 0 ? 1 : totalSupply);
+        if (totalSupply == 0) {
+            _liquidity = sqrt(amountA * amountB);
+        } else {
+            _liquidity = _calculateMin(tokenA, tokenB, amountA, amountB) * totalSupply;
+        }
         return _liquidity;
     }
 
@@ -165,8 +230,8 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     function _getOptimalAmountOut(uint256 _amount, uint256 _reserveA, uint256 _reserveB) 
             internal pure checkLiquidity(_reserveA, _reserveB) returns (uint256 amountOut) 
     {
-        require(_amount > 0,"SimpleSwap: Insufficient Ammount.");
-        amountOut = (_amount * _reserveB) / (_reserveA );
+        require(_amount > 0,"SSwap: Insufficient amount.");
+        amountOut = (_amount * _reserveB) / _reserveA;
         return amountOut;
     }
 
@@ -193,12 +258,12 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
         } else {
             optimalAmountB = _getOptimalAmountOut(amountADesired ,_reserveA,_reserveB);
             if (optimalAmountB <= amountBDesired ) {
-                require(optimalAmountB >= amountBMin, "SimpleSwap: Not enough B Balance.");
+                require(optimalAmountB >= amountBMin, "SSwap: B Balance.");
                 (amountA, amountB) = (amountADesired , optimalAmountB);
             } else {
                 optimalAmountA = _getOptimalAmountOut(amountBDesired ,_reserveB,_reserveA);
                 if (optimalAmountA <= amountADesired ) {
-                    require(optimalAmountA >= amountAMin, "SimpleSwap: Not enough A Balance.");  
+                    require(optimalAmountA >= amountAMin, "SSwap: A Balance.");  
                     (amountA, amountB) = (optimalAmountA, amountBDesired);
                 }
             }
@@ -223,9 +288,9 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     */
     function addLiquidity (address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, 
                            uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) 
-        external checkDeadline(deadline) returns (uint256 amountA, uint256 amountB, uint256 liquidity) 
+            external checkDeadline(deadline) nonReentrant returns (uint256 amountA, uint256 amountB, uint256 liquidity) 
     {
-
+        require(tokenA != tokenB, "SSwap: Same Tokens");
         (uint256 _reserveA, uint256 _reserveB) = _getReserves(tokenA, tokenB);
         (amountA, amountB) = _addLiquidity(amountADesired, amountBDesired, amountAMin, amountBMin, _reserveA, _reserveB);
 
@@ -234,6 +299,8 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
         
         liquidity = _calculateLiquidity(tokenA, tokenB, amountA, amountB, totalSupply());
         _mint(to, liquidity);
+        
+        emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA, amountB, liquidity);
 
         return (amountA, amountB, liquidity);
 
@@ -253,8 +320,8 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
             internal view checkLiquidity(_reserveA, _reserveB) returns (uint256 tokenAmountA, uint256 tokenAmountB) 
     {
         uint256 _totalSupply = totalSupply();
-        tokenAmountA = _liquidity / _totalSupply * _reserveA;
-        tokenAmountB = _liquidity / _totalSupply * _reserveB;
+        tokenAmountA = (_liquidity * _reserveA) / _totalSupply ;
+        tokenAmountB = (_liquidity * _reserveB) / _totalSupply ;
         
         return (tokenAmountA, tokenAmountB);
     }
@@ -272,14 +339,16 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     * @return amountB Amount of token B returned.
     */
     function removeLiquidity(address tokenA, address tokenB, uint liquidity, uint amountAMin, uint amountBMin, address to, uint deadline)
-            external checkDeadline(deadline) returns (uint amountA, uint amountB) 
+            external checkDeadline(deadline) nonReentrant returns (uint amountA, uint amountB) 
     {
         (uint256 _reserveA, uint256 _reserveB) = _getReserves(tokenA, tokenB);
         (amountA, amountB) = _removeLiquidity(liquidity, _reserveA, _reserveB);
-        require(amountA>=amountAMin && amountB>=amountBMin,"SimpleSwap: Not enough Balance.");
+        require(amountA>=amountAMin && amountB>=amountBMin,"SSwap: Balance.");
         burn(liquidity);
         _safeTransfer (tokenA,to,amountA);
         _safeTransfer (tokenB,to,amountB);
+
+        emit LiquidityRemoved(msg.sender, tokenA, tokenB, amountA, amountB, liquidity);
 
         return (amountA, amountB);
     }
@@ -311,12 +380,15 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     * @return amounts Array with input and output amounts: [amountIn, amountOut].
     */
     function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) 
-            external checkDeadline(deadline) checkTokensSelected(path) returns (uint[] memory amounts) 
+            external checkDeadline(deadline) checkTokensSelected(path) nonReentrant returns (uint[] memory amounts) 
     {
+        require(path[0] != path[1], "SSwap: Same tokens.");
         amounts = _getAmountsOut(amountIn, path);
-        require(amounts[1] >= amountOutMin, "SimpleSwap: Transfer cancelled.");
-        _safeTransferFrom(path[0], to, address(this), amountIn);
+        require(amounts[1] >= amountOutMin, "SSwap: Transfer cancelled.");
+        _safeTransferFrom(path[0], msg.sender, address(this), amountIn);
         _safeTransfer(path[1], to, amounts[1]);
+
+        emit TokenSwapped(msg.sender, path[0], path[1], amounts[0], amounts[1]);
         
         return amounts;
     }
@@ -332,9 +404,7 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) 
             external pure returns (uint amountOut) 
     {
-        require(amountIn > 0, "SimpleSwap: Insufficient Amount.");
-        require(reserveIn > 0 && reserveOut > 0, "SimpleSwap: Not Enough liquidity.");
-        amountOut = (amountIn * reserveOut) / (reserveIn);
+        amountOut = _getOptimalAmountOut(amountIn, reserveIn, reserveOut);
 
         return amountOut;
     }
@@ -349,8 +419,8 @@ contract SimpleSwap is ERC20, ERC20Burnable, Ownable {
     function getPrice(address tokenA, address tokenB) 
             external view returns (uint price) {
         (uint256 _reserveA, uint256 _reserveB) = _getReserves(tokenA, tokenB);
-        require(_reserveA>0 && _reserveB>0,"SimpleSwap: Not enough liquidity.");
-        price = _reserveB * 1e18 / _reserveA;
+        require(_reserveA>0 && _reserveB>0,"SSwap: Liquidity.");
+        price = (_reserveB * 1e18) / _reserveA;
         return price;
     }
 }
