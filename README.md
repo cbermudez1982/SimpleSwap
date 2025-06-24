@@ -188,3 +188,6 @@ uint price = simpleSwap.getPrice(tokenA, tokenB);
 - Reserves and prices are calculated dynamically.
 - No trading fees included — this can be added as a feature.
 
+## 📄 License
+
+MIT © Carlos Bermudez
