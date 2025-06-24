@@ -21,7 +21,7 @@ The contract uses the ERC20 standard for the liquidity pool token, implements to
 ## 🚀 Deployment
 | Network   | Contract Address                             | Deployer Address                          |
 |-----------|----------------------------------------------|-------------------------------------------|
-| Sepolia   | `0xD112f348e82642161a839Eb4f5b2Ea63b2BCB69E` | `0x181AcF0cA2E59Ad6B06b861235bB7BBf5F1f897E` |
+| Sepolia   | `0xce379F5429cAdBBed7C191331DaE5f12F5ba21e8` | `0xa7a33b766647bb6E1AF4F4F65a0A6EC102f4A921` |
   
 ---
 
